@@ -1,1 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attendance Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --surface-0: #f4f3f0; --surface-1: #eeecea; --surface-2: #ffffff;
+    --text-primary: #1a1a18; --text-secondary: #5f5e5a; --text-muted: #98978f;
+    --border: rgba(0,0,0,0.1); --border-strong: rgba(0,0,0,0.18); --radius: 8px;
+    --text-accent: #185fa5; --bg-accent: #e6f1fb;
+    --text-danger: #a32d2d; --bg-danger: #fcebeb;
+    --text-warning: #854f0b; --bg-warning: #faeeda;
+    --text-success: #3b6d11; --bg-success: #eaf3de;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-0: #1a1a18; --surface-1: #242422; --surface-2: #2e2e2c;
+      --text-primary: #e8e7e3; --text-secondary: #a09f98; --text-muted: #6a6a64;
+      --border: rgba(255,255,255,0.1); --border-strong: rgba(255,255,255,0.18);
+      --text-accent: #85b7eb; --bg-accent: #042c53;
+      --text-danger: #f09595; --bg-danger: #501313;
+      --text-warning: #ef9f27; --bg-warning: #412402;
+      --text-success: #97c459; --bg-success: #173404;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--surface-0); color: var(--text-primary); min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 960px; margin: 0 auto; }
+  .top-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 0.4rem; }
+  .logo { width: 32px; height: 32px; background: #e67e22; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: white; flex-shrink: 0; }
+  h1 { font-size: 20px; font-weight: 500; }
+  .subtitle { font-size: 13px; color: var(--text-secondary); margin-bottom: 1.5rem; margin-left: 44px; }
 
+  /* Upload zone */
+  .upload-zone { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1.5rem; background: var(--surface-2); cursor: pointer; transition: border-color 0.2s; }
+  .upload-zone:hover { border-color: var(--text-accent); }
+  .upload-zone.dragover { border-color: var(--text-accent); background: var(--bg-accent); }
+  .upload-zone input { display: none; }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .upload-sub { font-size: 12px; color: var(--text-secondary); }
+  .upload-btn { display: inline-block; margin-top: 12px; padding: 7px 16px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); font-size: 13px; cursor: pointer; background: var(--surface-1); color: var(--text-primary); }
+  .upload-btn:hover { background: var(--surface-0); }
+  .loaded-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-success); margin-bottom: 1.5rem; background: var(--bg-success); padding: 10px 14px; border-radius: var(--radius); }
+
+  /* Controls */
+  .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .controls label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+  select { appearance: none; background: var(--surface-2); border: 0.5px solid var(--border-strong); border-radius: var(--radius); padding: 8px 36px 8px 12px; font-size: 14px; color: var(--text-primary); cursor: pointer; min-width: 220px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  select:focus { outline: 2px solid var(--text-accent); outline-offset: 2px; }
+
+  /* Summary */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  .stat-card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 0.9rem 1rem; }
+  .stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 500; color: var(--text-primary); }
+  .stat-value.low { color: var(--text-success); }
+  .stat-value.mid { color: var(--text-warning); }
+  .stat-value.high { color: var(--text-danger); }
+  .stat-value.accent { color: var(--text-accent); }
+  .stat-value.sm { font-size: 15px; padding-top: 4px; }
+
+  /* Table */
+  .table-wrap { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  thead th { padding: 10px 12px; text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); border-bottom: 0.5px solid var(--border); background: var(--surface-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  thead th:first-child { border-radius: 12px 0 0 0; } thead th:last-child { border-radius: 0 12px 0 0; }
+  tbody td { padding: 10px 12px; color: var(--text-primary); border-bottom: 0.5px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-1); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .badge-absent { background: var(--bg-danger); color: var(--text-danger); }
+  .badge-tardy { background: var(--bg-warning); color: var(--text-warning); }
+  .badge-early { background: var(--bg-warning); color: var(--text-warning); }
+  .badge-meal { background: var(--bg-accent); color: var(--text-accent); }
+  .badge-waived { background: var(--bg-success); color: var(--text-success); }
+  .badge-other { background: var(--surface-1); color: var(--text-secondary); border: 0.5px solid var(--border-strong); }
+  .hidden { display: none; }
+  .footer { margin-top: 1rem; font-size: 11px; color: var(--text-muted); text-align: right; }
+  .how-to { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 13px; color: var(--text-secondary); }
+  .how-to strong { color: var(--text-primary); display: block; margin-bottom: 6px; font-size: 14px; }
+  .how-to ol { padding-left: 1.2rem; line-height: 2; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <div class="logo">IC</div>
+    <h1>Attendance &amp; occurrences</h1>
+  </div>
+  <p class="subtitle">Upload your attendance CSV, then select a name to view their record.</p>
+
+  <div class="how-to" id="howTo">
+    <strong>How to update the data</strong>
+    <ol>
+      <li>Open the attendance Google Sheet</li>
+      <li>Go to the <strong>Report - Simple</strong> tab</li>
+      <li>Click <strong>File → Download → Comma Separated Values (.csv)</strong></li>
+      <li>Come back here and upload that file below</li>
+    </ol>
+  </div>
+
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept=".csv" />
+    <div class="upload-icon">📂</div>
+    <div class="upload-title">Upload attendance CSV</div>
+    <div class="upload-sub">Drag and drop your CSV file here, or click to browse</div>
+    <label class="upload-btn" for="fileInput">Choose file</label>
+  </div>
+
+  <div id="loadedInfo" class="loaded-info hidden">
+    ✓ <span id="loadedFileName"></span> loaded successfully
+  </div>
+
+  <div id="mainContent" class="hidden">
+    <div class="controls">
+      <label for="nameSelect">Specialist</label>
+      <select id="nameSelect">
+        <option value="">— Select your name —</option>
+      </select>
+    </div>
+
+    <div id="summarySection" class="hidden">
+      <div class="summary-grid" id="summaryGrid"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:88px">Date</th>
+              <th style="width:105px">Event</th>
+              <th style="width:145px">Event class</th>
+              <th style="width:72px">Arrival</th>
+              <th style="width:80px">Departure</th>
+              <th style="width:65px">Points</th>
+              <th style="width:96px">Expires</th>
+              <th style="width:75px">Balance</th>
+              <th style="width:80px">Forgiveness</th>
+              <th>Comments</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="footer" id="footerNote"></div>
+    </div>
+    <div id="emptyState" class="hidden" style="text-align:center;padding:3rem 1rem;color:var(--text-secondary);font-size:14px;">No records found for this specialist.</div>
+  </div>
+</div>
+
+<script>
+let allRows = [];
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  
+  function splitLine(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  // Find header row
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const lower = lines[i].toLowerCase();
+    if (lower.includes('date') && lower.includes('name') && lower.includes('event')) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx === -1) return [];
+
+  const headers = splitLine(lines[headerIdx]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g,''));
+  
+  const idx = {
+    date: headers.findIndex(h => h === 'date'),
+    name: headers.findIndex(h => h === 'name'),
+    event: headers.findIndex(h => h.includes('event') && !h.includes('class')),
+    comments: headers.findIndex(h => h.includes('comment')),
+    arrival: headers.findIndex(h => h.includes('arrival')),
+    departure: headers.findIndex(h => h.includes('departure')),
+    eventClass: headers.findIndex(h => h.includes('eventclass') || h.includes('class')),
+    occurrence: headers.findIndex(h => h === 'occurrence' || h === 'occurrences'),
+    expiration: headers.findIndex(h => h.includes('expir')),
+    balance: headers.findIndex(h => h.includes('balance') || h.includes('activebalance')),
+    forgiveness: headers.findIndex(h => h.includes('forgiveness')),
+  };
+
+  const get = (cols, i) => (i >= 0 && i < cols.length) ? cols[i].replace(/^"|"$/g,'').trim() : '';
+
+  return lines.slice(headerIdx + 1)
+    .map(line => splitLine(line))
+    .filter(cols => cols.length > 2 && get(cols, idx.date) && get(cols, idx.name))
+    .map(cols => ({
+      date: get(cols, idx.date),
+      name: get(cols, idx.name),
+      event: get(cols, idx.event),
+      comments: get(cols, idx.comments),
+      arrival: get(cols, idx.arrival),
+      departure: get(cols, idx.departure),
+      eventClass: get(cols, idx.eventClass),
+      occurrence: get(cols, idx.occurrence),
+      expiration: get(cols, idx.expiration),
+      balance: get(cols, idx.balance),
+      forgiveness: get(cols, idx.forgiveness),
+    }))
+    .filter(r => r.name);
+}
+
+function getBadgeClass(event) {
+  const e = (event || '').toLowerCase();
+  if (e.includes('absent')) return 'badge-absent';
+  if (e.includes('tardy')) return 'badge-tardy';
+  if (e.includes('early departure')) return 'badge-early';
+  if (e.includes('meal')) return 'badge-meal';
+  if (e.includes('waived')) return 'badge-waived';
+  return 'badge-other';
+}
+
+function loadData(rows, fileName) {
+  allRows = rows;
+  const names = [...new Set(rows.map(r => r.name))].sort();
+  const sel = document.getElementById('nameSelect');
+  sel.innerHTML = '<option value="">— Select your name —</option>';
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+
+  document.getElementById('loadedInfo').classList.remove('hidden');
+  document.getElementById('loadedFileName').textContent = fileName + ' — ' + rows.length + ' records, ' + names.length + ' specialists';
+  document.getElementById('mainContent').classList.remove('hidden');
+  document.getElementById('uploadZone').classList.add('hidden');
+  document.getElementById('howTo').classList.add('hidden');
+  document.getElementById('footerNote').textContent = 'Loaded: ' + fileName + ' · ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderForName(name) {
+  const rows = allRows.filter(r => r.name === name);
+  const tbody = document.getElementById('tableBody');
+  const summaryGrid = document.getElementById('summaryGrid');
+  const summarySection = document.getElementById('summarySection');
+  const emptyState = document.getElementById('emptyState');
+  tbody.innerHTML = ''; summaryGrid.innerHTML = '';
+
+  if (!rows.length) { summarySection.classList.add('hidden'); emptyState.classList.remove('hidden'); return; }
+  summarySection.classList.remove('hidden'); emptyState.classList.add('hidden');
+
+  const totalOcc = rows.reduce((s, r) => s + (parseFloat(r.occurrence) || 0), 0);
+  const latestBalance = parseFloat(rows[rows.length - 1].balance) || 0;
+  const latestExpiry = rows[rows.length - 1].expiration || '—';
+  const forgUsed = rows.reduce((s, r) => s + (parseFloat(r.forgiveness) || 0), 0);
+  const balClass = latestBalance >= 4 ? 'high' : latestBalance >= 2 ? 'mid' : 'low';
+
+  summaryGrid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total events</div><div class="stat-value accent">${rows.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Total points</div><div class="stat-value ${balClass}">${totalOcc.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Active balance</div><div class="stat-value ${balClass}">${latestBalance.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Forgiveness days used</div><div class="stat-value">${forgUsed % 1 === 0 ? forgUsed : forgUsed.toFixed(1)}</div></div>
+    <div class="stat-card"><div class="stat-label">Next expiration</div><div class="stat-value sm">${latestExpiry}</div></div>
+  `;
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const occ = parseFloat(r.occurrence), bal = parseFloat(r.balance);
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td><span class="badge ${getBadgeClass(r.event)}">${r.event || '—'}</span></td>
+      <td title="${r.eventClass}">${r.eventClass || '—'}</td>
+      <td>${r.arrival || '—'}</td>
+      <td>${r.departure || '—'}</td>
+      <td>${isNaN(occ) ? (r.occurrence || '—') : occ.toFixed(2)}</td>
+      <td>${r.expiration || '—'}</td>
+      <td>${isNaN(bal) ? (r.balance || '—') : bal.toFixed(2)}</td>
+      <td>${r.forgiveness || '—'}</td>
+      <td title="${r.comments}">${r.comments || '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function handleFile(file) {
+  if (!file || !file.name.endsWith('.csv')) { alert('Please upload a CSV file.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows = parseCSV(e.target.result);
+    if (!rows.length) { alert('Could not read data from this file. Make sure you downloaded the Report - Simple tab as CSV.'); return; }
+    loadData(rows, file.name);
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+document.getElementById('nameSelect').addEventListener('change', e => {
+  const name = e.target.value;
+  if (!name) { document.getElementById('summarySection').classList.add('hidden'); document.getElementById('emptyState').classList.add('hidden'); }
+  else renderForName(name);
+});
+
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+</script>
+</body>
+</html>
